@@ -23,6 +23,7 @@
 (defn retrieve-todo [id] (first (sql/query @db-spec ["SELECT * FROM todo WHERE id = ?" id])))
 (defn insert-todo [todo] (sql/insert! @db-spec :todo todo))
 (defn update-todo [todo] (sql/update! @db-spec :todo todo ["id = ?" (:id todo)]))
+(defn delete-todo [id] (sql/delete! @db-spec :todo ["id = ?" id]))
 
 ;;
 ;; Business handlers
@@ -54,15 +55,16 @@
           (for [todo todos]
             (let [id (:id todo)
                   done (= ":done" (:state todo))]
-              (form-to [:post (str "/toggle/" id)]
+              (form-to [:post (str "/edit/" id)]
                        [:li 
                         [:div 
                          (if done 
                            [:del (:task todo)]
                            (:task todo))
-                         (submit-button (if done
-                                          "Undo"
-                                          "Complete"))]])))]
+                         (submit-button {:name "submit"} (if done
+                                                           "Undo"
+                                                           "Complete"))
+                         (submit-button {:name "submit"} "Delete")]])))]
          (form-to [:post "/add"]
           (text-field {:placeholder "I need todo"} "todo")
           (submit-button "Add"))]))
@@ -76,8 +78,10 @@
   (GET "/" [] (todo-list (retrieve-todos)))
   (POST "/add" req (add-todo (:params req))
                    (response/redirect "/"))
-  (POST "/toggle/:id" [id] (toggle-todo id)
-                           (response/redirect "/"))
+  (POST "/edit/:id" [id submit] (if (= "Delete" submit)
+                                  (delete-todo id)
+                                  (toggle-todo id))
+                                (response/redirect "/"))
   (GET "/about" [] (about-page)))
 
 ;;
