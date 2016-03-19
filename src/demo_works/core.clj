@@ -1,6 +1,7 @@
 (ns demo-works.core
   (:require [ring.adapter.jetty :as jetty]
             [ring.middleware.params :refer :all]
+            [ring.util.response :as response]
             [compojure.core :refer :all]
             [hiccup.core :refer :all]
             [hiccup.form :refer :all]
@@ -19,7 +20,9 @@
    :subname database-filename})
 
 (defn retrieve-todos [] (sql/query @db-spec "SELECT * FROM todo"))
+(defn retrieve-todo [id] (first (sql/query @db-spec ["SELECT * FROM todo WHERE id = ?" id])))
 (defn insert-todo [todo] (sql/insert! @db-spec :todo todo))
+(defn update-todo [todo] (sql/update! @db-spec :todo todo ["id = ?" (:id todo)]))
 
 ;;
 ;; Business handlers
@@ -31,6 +34,15 @@
     (when (and todo (not= "" todo))
       (insert-todo record))))
 
+(defn toggle-state [state] (if (= ":todo" state) ":done" ":todo"))
+
+(defn toggle-todo
+  [id]
+  (-> id
+      retrieve-todo
+      (update :state toggle-state)
+      update-todo))
+
 ;;
 ;; Page rendering and routing
 ;;
@@ -40,7 +52,17 @@
          [:h1 "TODO List"]
          [:ul 
           (for [todo todos]
-            [:li (:task todo)])]
+            (let [id (:id todo)
+                  done (= ":done" (:state todo))]
+              (form-to [:post (str "/toggle/" id)]
+                       [:li 
+                        [:div 
+                         (if done 
+                           [:del (:task todo)]
+                           (:task todo))
+                         (submit-button (if done
+                                          "Undo"
+                                          "Complete"))]])))]
          (form-to [:post "/add"]
           (text-field {:placeholder "I need todo"} "todo")
           (submit-button "Add"))]))
@@ -52,9 +74,10 @@
 
 (defroutes app
   (GET "/" [] (todo-list (retrieve-todos)))
-  (POST "/add" req (do
-                     (add-todo (:params req))
-                     (todo-list (retrieve-todos))))
+  (POST "/add" req (add-todo (:params req))
+                   (response/redirect "/"))
+  (POST "/toggle/:id" [id] (toggle-todo id)
+                           (response/redirect "/"))
   (GET "/about" [] (about-page)))
 
 ;;
