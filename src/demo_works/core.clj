@@ -19,7 +19,8 @@
    :subprotocol "sqlite"
    :subname database-filename})
 
-(defn retrieve-todos [] (sql/query @db-spec "SELECT * FROM todo"))
+(defn retrieve-lists [] (sql/query @db-spec "SELECT * FROM list"))
+(defn retrieve-todos [list-id] (sql/query @db-spec ["SELECT * FROM todo WHERE list_id = ?" list-id]))
 (defn retrieve-todo [id] (first (sql/query @db-spec ["SELECT * FROM todo WHERE id = ?" id])))
 (defn insert-todo [todo] (sql/insert! @db-spec :todo todo))
 (defn update-todo [todo] (sql/update! @db-spec :todo todo ["id = ?" (:id todo)]))
@@ -29,9 +30,8 @@
 ;; Business handlers
 ;;
 (defn add-todo
-  [input]
-  (let [todo (get input "todo")
-        record {:task todo :state ":todo"}]
+  [list-id todo]
+  (let [record {:list_id list-id :task todo :state ":todo"}]
     (when (and todo (not= "" todo))
       (insert-todo record))))
 
@@ -47,27 +47,38 @@
 ;;
 ;; Page rendering and routing
 ;;
+(defn format-todo
+  [todo]
+  (let [id (:id todo)
+        done (= ":done" (:state todo))]
+    (form-to [:post (str "/edit/" id)]
+             [:li 
+              [:div 
+               (if done 
+                 [:del (:task todo)]
+                 (:task todo))
+               (submit-button {:name "submit"} (if done
+                                                 "Undo"
+                                                 "Complete"))
+               (submit-button {:name "submit"} "Delete")]])))
+
+(defn format-list
+  [list]
+  (let [list-id (:id list)
+        todos (retrieve-todos list-id)]
+    [:div
+     [:h2 (:name list)]
+     [:ul 
+      (for [todo todos]
+        (format-todo todo))]
+     (form-to [:post (str "/add/" list-id)]
+              (text-field {:placeholder "I need todo"} "todo")
+              (submit-button "Add"))]))
+
 (defn todo-list
-  [todos]
-  (html [:div
-         [:h1 "TODO List"]
-         [:ul 
-          (for [todo todos]
-            (let [id (:id todo)
-                  done (= ":done" (:state todo))]
-              (form-to [:post (str "/edit/" id)]
-                       [:li 
-                        [:div 
-                         (if done 
-                           [:del (:task todo)]
-                           (:task todo))
-                         (submit-button {:name "submit"} (if done
-                                                           "Undo"
-                                                           "Complete"))
-                         (submit-button {:name "submit"} "Delete")]])))]
-         (form-to [:post "/add"]
-          (text-field {:placeholder "I need todo"} "todo")
-          (submit-button "Add"))]))
+  [lists]
+  (html (for [list lists]
+          (format-list list))))
   
 (defn about-page
   []
@@ -75,9 +86,9 @@
         [:p "This project is to demonstrate a basic web application to the phenomenal staff of Democracy Works!"]))
 
 (defroutes app
-  (GET "/" [] (todo-list (retrieve-todos)))
-  (POST "/add" req (add-todo (:params req))
-                   (response/redirect "/"))
+  (GET "/" [] (todo-list (retrieve-lists)))
+  (POST "/add/:list-id" [list-id todo] (add-todo list-id todo)
+                                       (response/redirect "/"))
   (POST "/edit/:id" [id submit] (if (= "Delete" submit)
                                   (delete-todo id)
                                   (toggle-todo id))
