@@ -166,9 +166,12 @@
 ;; Main execution
 ;;
 (defn -main
-  [database & args]
-  (reset! db-spec (build-database database))
-  (jetty/run-jetty (-> app
-                       wrap-params
-                       (wrap-session {:cookie-attrs {:max-age 3600}}))
-                   {:port 3000}))
+  [& args]
+  (if (= 1 (count args))
+    (do 
+      (reset! db-spec (build-database (first args)))
+      (jetty/run-jetty (-> app
+                           wrap-params
+                           (wrap-session {:cookie-attrs {:max-age 3600}}))
+                       {:port 3000}))
+    (println "Usage: lein run <database file>")))
