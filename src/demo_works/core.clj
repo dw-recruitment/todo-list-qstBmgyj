@@ -16,14 +16,14 @@
   "Setup the session with the user ID"
   [user-id]
   (-> user-id
-      db/retrieve-user
+      user
       view/home-page
       response/response
       (assoc :session {:user-id user-id})))
 
 (defn show-login 
   [] 
-  (view/login-page (db/retrieve-users)))
+  (view/login-page (all-users)))
 
 (defn get-user-id [session] (:user-id session))
 
@@ -35,7 +35,7 @@
   (GET "/login/:id" [id] (login-user id))
   (GET "/logout" [:as {session :session}] (-> (response/response (show-login))
                                               (assoc :session nil)))
-  (GET "/home" [:as {session :session}] (-> (get-user-id session) db/retrieve-user view/home-page))
+  (GET "/home" [:as {session :session}] (-> (get-user-id session) user view/home-page))
   (POST "/add/:list-id" [list-id todo :as {session :session}] (add-todo (get-user-id session) list-id todo)
                                                               (response/redirect "/home"))
   (POST "/edit/:id" [id submit :as {session :session}] (let [user-id (get-user-id session)]

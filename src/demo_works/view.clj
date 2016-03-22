@@ -40,7 +40,7 @@
 
 (defn home-page
   [user]
-  (let [lists (get-lists-by-user (:id user))]
+  (let [lists (user-lists (:id user))]
     (html [:div
            [:h1 (str "Hello " (:name user))]
            (link-to "/logout" "Logout")

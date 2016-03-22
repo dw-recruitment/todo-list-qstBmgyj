@@ -1,6 +1,9 @@
 (ns demo-works.domain
   (:require [demo-works.db :as db]))
 
+(defn user [id] (db/retrieve-user id))
+(defn all-users [] (db/retrieve-users))
+
 (defn add-todo
   "Given a user and a list, add a todo"
   [user-id list-id todo]
@@ -25,7 +28,7 @@
   (when (db/retrieve-todo user-id id)
     (db/delete-todo id)))
 
-(defn get-lists-by-user
+(defn user-lists
   "Retrieve all lists a user has access to"
   [user-id]
   (->> user-id
